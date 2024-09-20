@@ -1,0 +1,14 @@
+{
+  "name": "opm-bot",
+  "version": "1.0.0",
+  "description": "Discord Bot for the OPM Madden League",
+  "main": "src/index.js",
+  "author": "Remzi Zayid",
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "axios": "^1.7.7",
+    "discord.js": "^14.16.2",
+    "dotenv": "^16.4.5"
+  }
+}
