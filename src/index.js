@@ -33,7 +33,5 @@ client.on('messageCreate', (message) => {
     }
 });
 
-// Log in to Discord using the bot token from your .env file
 const token = process.env.DISCORD_BOT_TOKEN;
-console.log('Logging in with token: ', token);
 client.login(token);
