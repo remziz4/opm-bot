@@ -1,9 +1,15 @@
-import { Client, GatewayIntentBits } from 'discord.js';
-import { handleAnnouncement, handleTrade } from './message-handlers/index.js';
+import { Client as DiscordClient, GatewayIntentBits } from 'discord.js';
+import whatsAppWeb from 'whatsapp-web.js';
+import QRCode from 'qrcode';
 import dotenv from 'dotenv';
+import { handleAnnouncement, handleTrade } from './message-handlers/index.js';
+
+const { Client: WhatsAppClient, LocalAuth } = whatsAppWeb;
 
 dotenv.config();
-const client = new Client({
+
+/* Discord Configuration */
+const discordClient = new DiscordClient({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
@@ -16,11 +22,11 @@ const getChannelIds = () => ({
     trades: process.env.TRADE_CHANNEL_ID
 });
 
-client.once('ready', () => {
-    console.log(`Logged in as ${client.user.tag}!`);
+discordClient.once('ready', () => {
+    console.log(`Logged in as ${discordClient.user.tag}!`);
 });
 
-client.on('messageCreate', (message) => {
+discordClient.on('messageCreate', (message) => {
     if (message.author.id === process.env.NEON_BOT_ID) {
         const channelIds = getChannelIds();
         switch(message.channel.id) {
@@ -34,4 +40,22 @@ client.on('messageCreate', (message) => {
 });
 
 const token = process.env.DISCORD_BOT_TOKEN;
-client.login(token);
+discordClient.login(token);
+
+/* WhatsApp Configuration */
+export const whatsappClient = new WhatsAppClient({ authStrategy: new LocalAuth() });
+
+whatsappClient.on('qr', (qr) => {
+    console.log('WhatsApp Web Client QR Code (scan this from whatsapp web to authorize this bot:')
+    QRCode.toString(qr, (err, url) => {
+        if (err) throw err;
+        console.log(url);
+    });
+});
+
+whatsappClient.on('ready', () => {
+    console.log('Client is ready!');
+});
+
+console.log('Initializing WhatsApp client...')
+whatsappClient.initialize();
