@@ -30,15 +30,15 @@ has been submitted and is *pending review*.`;
 
         case 'APPROVED':
             message += `✅ Trade between the:
-  ${getTeamText(team1)}
-  ${getTeamText(team2)}
+- ${getTeamText(team1)}
+- ${getTeamText(team2)}
 has been *approved*! The involved teams can proceed with executing the trade in-game.`;
             break;
 
         case 'DENIED':
             message += `⛔Trade between the:
-  ${getTeamText(team1)}\n
-  ${getTeamText(team2)}\n
+- ${getTeamText(team1)}\n
+- ${getTeamText(team2)}\n
 has been *denied*.`;
     }
 
