@@ -45,11 +45,14 @@ discordClient.login(token);
 /* WhatsApp Configuration */
 export const whatsappClient = new WhatsAppClient({
     authStrategy: new LocalAuth(),
-    puppeteer: { headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] }
+    puppeteer: {
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    }
 });
 
 whatsappClient.on('qr', (qr) => {
-    console.log('WhatsApp Web Client QR Code (scan this from whatsapp web to authorize this bot:')
+    console.log('WhatsApp Web Client QR Code (scan this from whatsapp web to authorize this bot):')
     QRCode.toString(qr, (err, url) => {
         if (err) throw err;
         console.log(url);
