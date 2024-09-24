@@ -1,5 +1,5 @@
 export const NFL_TEAM_EMOJIS = {
-    CARDINALS: '🐦',
+    CARDINALS: '🐦‍🔥',
     FALCONS: '🪽',
     RAVENS: '🐦‍⬛',
     BILLS: '🦬',
