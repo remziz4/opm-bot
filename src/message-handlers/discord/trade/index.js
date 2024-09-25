@@ -1,5 +1,6 @@
-import { sendMessageToRecipients } from '../../api/whatsapp/index.js';
-import { NFL_TEAM_EMOJIS } from '../../data/teams/index.js';
+import { sendMessageToRecipients } from '../../../api/whatsapp/index.js';
+import { NFL_TEAM_EMOJIS } from '../../../data/teams/index.js';
+import { BOT_NOTICE } from "../../../util/constants/index.js";
 
 const getMessageType = (heading) => {
     if (heading.includes('Pending')) {
@@ -42,10 +43,10 @@ has been *approved*! The involved teams can proceed with executing the trade in-
 has been *denied*.`;
     }
 
-    console.log('message before adding URL: ', message)
+    console.log('message before adding URL: ', message);
 
-    message += `\n\nClick here to view details: ${tradeUrl}`
-    message+= `\n\n🤖 *This is an automated message* 🤖`
+    message += `\n\nClick here to view details: ${tradeUrl}`;
+    message+= BOT_NOTICE;
     return message;
 }
 

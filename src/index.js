@@ -2,7 +2,8 @@ import { Client as DiscordClient, GatewayIntentBits } from 'discord.js';
 import whatsAppWeb from 'whatsapp-web.js';
 import QRCode from 'qrcode';
 import dotenv from 'dotenv';
-import { handleAnnouncement, handleTrade } from './message-handlers/index.js';
+import { handleAnnouncement, handleTrade } from './message-handlers/discord/index.js';
+import {handleMainChatMessage} from "./message-handlers/whatsapp/index.js";
 
 const { Client: WhatsAppClient, LocalAuth } = whatsAppWeb;
 
@@ -17,7 +18,7 @@ const discordClient = new DiscordClient({
     ],
 });
 
-const getChannelIds = () => ({
+const getDiscordChannelIds = () => ({
     announcements: process.env.ANNOUNCEMENT_CHANNEL_ID,
     trades: process.env.TRADE_CHANNEL_ID
 });
@@ -28,7 +29,7 @@ discordClient.once('ready', () => {
 
 discordClient.on('messageCreate', (message) => {
     if (message.author.id === process.env.NEON_BOT_ID) {
-        const channelIds = getChannelIds();
+        const channelIds = getDiscordChannelIds();
         switch(message.channel.id) {
             case channelIds.announcements:
                 handleAnnouncement(message);
@@ -61,6 +62,12 @@ whatsappClient.on('qr', (qr) => {
 
 whatsappClient.on('ready', () => {
     console.log('Client is ready!');
+});
+
+whatsappClient.on('message_create', (message) => {
+    if (message['_data'].id.remote === process.env.MAIN_GROUP_ID) {
+        handleMainChatMessage(message);
+    }
 });
 
 console.log('Initializing WhatsApp client...')
