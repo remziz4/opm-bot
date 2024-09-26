@@ -60,7 +60,7 @@ whatsappClient.on('qr', (qr) => {
     });
 });
 
-whatsappClient.on('ready', () => {
+whatsappClient.on('ready', async () => {
     console.log('Client is ready!');
 });
 
