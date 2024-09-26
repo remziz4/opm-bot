@@ -7,7 +7,7 @@ const getTeams = () => {
     console.log('reading file from: ', filePath);
     const data = fs.readFileSync(filePath, 'utf8');
     const obj = JSON.parse(data);
-    console.log('data from file: ', obj);
+    console.log(`read ${Object.keys(obj).length} keys from player_teams.json`);
     return obj;
 }
 
