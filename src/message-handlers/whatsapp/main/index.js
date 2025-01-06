@@ -15,44 +15,76 @@ const getTeams = () => {
 const transformAbbreviatedNames = (teamName) => {
     teamName = teamName.toUpperCase();
     switch (teamName) {
-        case 'CARDS': return 'CARDINALS';
-        case 'BUCS': return 'BUCCANEERS';
-        case 'NINERS': return '49ERS';
-        case 'PATS': return 'PATRIOTS';
-        case 'HAWKS': return 'SEAHAWKS';
-        case 'JAGS': return 'JAGUARS';
-        case 'ARZ': return 'CARDINALS';
-        case 'ATL': return 'FALCONS';
-        case 'BAL': return 'RAVENS';
-        case 'BUF': return 'BILLS';
-        case 'CAR': return 'PANTHERS';
-        case 'CHI': return 'BEARS';
-        case 'CIN': return 'BENGALS';
-        case 'CLE': return 'BROWNS';
-        case 'DAL': return 'COWBOYS';
-        case 'DEN': return 'BRONCOS';
-        case 'DET': return 'LIONS';
-        case 'GB': return 'PACKERS';
-        case 'HOU': return 'TEXANS';
-        case 'IND': return 'COLTS';
-        case 'JAX': return 'JAGUARS';
-        case 'KC': return 'CHIEFS';
-        case 'LAC': return 'CHARGERS';
-        case 'LAR': return 'RAMS';
-        case 'LV': return 'RAIDERS';
-        case 'MIA': return 'DOLPHINS';
-        case 'MIN': return 'VIKINGS';
-        case 'NE': return 'PATRIOTS';
-        case 'NO': return 'SAINTS';
-        case 'NYG': return 'GIANTS';
-        case 'NYJ': return 'JETS';
-        case 'PHI': return 'EAGLES';
-        case 'PIT': return 'STEELERS';
-        case 'SEA': return 'SEAHAWKS';
-        case 'SF': return '49ERS';
-        case 'TB': return 'BUCCANEERS';
-        case 'TEN': return 'TITANS';
-        case 'WAS': return 'COMMANDERS';
+        case 'CARDS':
+        case 'ARZ':
+            return 'CARDINALS';
+        case 'BUCS':
+        case 'TB':
+            return 'BUCCANEERS';
+        case 'NINERS':
+        case 'SF':
+            return '49ERS';
+        case 'PATS':
+        case 'NE':
+            return 'PATRIOTS';
+        case 'HAWKS':
+        case 'SEA':
+            return 'SEAHAWKS';
+        case 'JAGS':
+        case 'JAX':
+            return 'JAGUARS';
+        case 'ATL':
+            return 'FALCONS';
+        case 'BAL':
+            return 'RAVENS';
+        case 'BUF':
+            return 'BILLS';
+        case 'CAR':
+            return 'PANTHERS';
+        case 'CHI':
+            return 'BEARS';
+        case 'CIN':
+            return 'BENGALS';
+        case 'CLE':
+            return 'BROWNS';
+        case 'DAL':
+            return 'COWBOYS';
+        case 'DEN':
+            return 'BRONCOS';
+        case 'DET':
+            return 'LIONS';
+        case 'GB':
+            return 'PACKERS';
+        case 'HOU':
+            return 'TEXANS';
+        case 'IND':
+            return 'COLTS';
+        case 'KC':
+            return 'CHIEFS';
+        case 'LAC':
+            return 'CHARGERS';
+        case 'LAR':
+            return 'RAMS';
+        case 'LV':
+            return 'RAIDERS';
+        case 'MIA':
+            return 'DOLPHINS';
+        case 'MIN':
+            return 'VIKINGS';
+        case 'NO':
+            return 'SAINTS';
+        case 'NYG':
+            return 'GIANTS';
+        case 'NYJ':
+            return 'JETS';
+        case 'PHI':
+            return 'EAGLES';
+        case 'PIT':
+            return 'STEELERS';
+        case 'TEN':
+            return 'TITANS';
+        case 'WAS':
+            return 'COMMANDERS';
         default: return teamName;
     }
 }
@@ -60,24 +92,27 @@ const transformAbbreviatedNames = (teamName) => {
 export default async (message) => {
     const { _data: data } = message;
     if (data.body?.match(/!\w{2,}/)) {
-        const matchingTokens = data.body.split(/\s+/).filter(token => token.match(/!\w{2,}/));
-        if (!matchingTokens.length) return;
         const teams = getTeams();
-        const teamMessageContents = [];
         const teamMentions = [];
-        for (const token of matchingTokens) {
-            const teamName = transformAbbreviatedNames(token.substring(1).toUpperCase());
-            const teamRecord = teams[teamName];
-            if (teamRecord) {
-                const teamContact = await whatsappClient.getContactById(teamRecord.id);
-                const messageContent = `@${teamContact.id.user} ${NFL_TEAM_EMOJIS[teamName]}`;
-                teamMentions.push(teamContact.id['_serialized']);
-                teamMessageContents.push(messageContent);
+        // Split the message into parts, use (\s+) instead of just \s+ to keep the whitespace in the parts array
+        const parts = data.body.split(/(\s+)/);
+        const processedParts = await Promise.all(parts.map(async (part) => {
+            // Only process parts that match the token pattern
+            if (part.match(/^!\w{2,}/)) {
+                const teamName = transformAbbreviatedNames(part.substring(1).toUpperCase());
+                const teamRecord = teams[teamName];
+                if (teamRecord) {
+                    const teamContact = await whatsappClient.getContactById(teamRecord.id);
+                    const messageContent = `@${teamContact.id.user} ${NFL_TEAM_EMOJIS[teamName]}`;
+                    teamMentions.push(teamContact.id['_serialized']);
+                    return messageContent;
+                }
             }
-        }
-        if (teamMessageContents.length) {
-            const fullMessageContent = teamMessageContents.join('\n') + '\n\n(Sent by OPM-Bot 🤖)';
-            message.reply(fullMessageContent, message['_data'].id.remote, { mentions: teamMentions });
+            return part; // Return unchanged whitespace or non-matching parts
+        }));
+        if (teamMentions.length) {
+            const processedMessage = processedParts.join('') + '\n\n(Sent by OPM-Bot 🤖)';
+            message.reply(processedMessage, message['_data'].id.remote, { mentions: teamMentions });
         }
     }
 };
