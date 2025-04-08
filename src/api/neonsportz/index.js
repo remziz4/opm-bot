@@ -26,13 +26,13 @@ const getCurrentWeek = async () => {
     const client = await getClient();
 
     try {
-        const response = await client.get('/gotw');
-        const [game] = response.data;
+        const response = await client.get('/teams?size=1');
+        const [team] = response.data.results;
 
-        if (game) {
+        if (team) {
             return {
-                season: game.seasonIndex + 1,
-                week: game.weekIndex + 1,
+                season: team.seasonIndex + 1,
+                week: team.weekIndex + 1,
             }
         } else {
             throw new Error('Invalid response format or empty data array');

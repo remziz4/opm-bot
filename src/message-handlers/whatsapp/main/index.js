@@ -112,7 +112,7 @@ const processOpponentLookup = async (message) => {
     const game = await neonClient.getTeamMatchup(NFL_TEAM_CITY_ABBREVIATIONS[teamName]);
 
     if (!game) {
-        await message.reply(`No game found for ${teamName}.\n\n${SENT_BY_OPM_BOT_TAG}`, data.id.remote);
+        await message.reply(`${teamName} have no game this week.\n\n${SENT_BY_OPM_BOT_TAG}`, data.id.remote);
         return;
     }
 
@@ -254,8 +254,29 @@ const processScheduleLookup = async (message, incompleteOnly = false) => {
 const processWeekLookup = async (message) => {
     try {
         const { season, week } = await neonClient.getCurrentWeek();
+
+        let weekText;
+
+        if (week <= 18) {
+            weekText = `week ${week}`;
+        } else {
+            switch (week) {
+                case 19:
+                    weekText = 'the Wild Card round';
+                    break;
+                case 20:
+                    weekText = 'the Divisional round';
+                    break;
+                case 21:
+                    weekText = 'the Championship round';
+                    break;
+                default:
+                    weekText = 'the Super Bowl week';
+            }
+        }
+
         await message.reply(
-            `${wrapInMonospace(`We are currently in week ${week} of season ${season} as of the latest Neon Update.`)}\n${SENT_BY_OPM_BOT_TAG}`,
+            `${wrapInMonospace(`We are currently in ${weekText} of season ${season} as of the latest Neon Update.`)}\n${SENT_BY_OPM_BOT_TAG}`,
             message['_data'].id.remote,
         );
     } catch (err) {
