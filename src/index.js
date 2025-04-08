@@ -65,8 +65,12 @@ whatsappClient.on('ready', async () => {
 });
 
 whatsappClient.on('message_create', (message) => {
-    if (message['_data'].id.remote === process.env.MAIN_GROUP_ID) {
-        handleMainChatMessage(message);
+    try {
+        if (message['_data'].id.remote === process.env.MAIN_GROUP_ID) {
+            handleMainChatMessage(message);
+        }
+    } catch (err) {
+        console.error('Failed to process message: ', err);
     }
 });
 
