@@ -242,7 +242,7 @@ const processScheduleLookup = async (message, incompleteOnly = false) => {
     }
 
     const messageBody =
-        wrapInMonospace(headerLine + lines.join('\n'))
+        wrapInMonospace(headerLine + lines.join('\n\n'))
         + `\n\n${SENT_BY_OPM_BOT_TAG}`;
 
     await message.reply(messageBody, data.id.remote, {
