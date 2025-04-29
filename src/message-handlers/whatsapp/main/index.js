@@ -19,7 +19,7 @@ const getPlayerTeams = () => {
 }
 
 const detectMessageType = (msg) => {
-    const trimmedMsg = msg.trim();
+    const trimmedMsg = msg?.trim() ?? '';
 
     const startingToken = trimmedMsg.match(/^!(\S+)/)?.[1];
     const hasTokens = /!\S+/.test(trimmedMsg);
