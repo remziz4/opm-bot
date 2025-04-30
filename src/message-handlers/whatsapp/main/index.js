@@ -203,13 +203,15 @@ const processStandingsLookup = async (message) => {
 
 const processScheduleLookup = async (message, incompleteOnly = false) => {
     const { _data: data } = message;
-    const { season, week } = await neonClient.getCurrentWeek();
-    const schedule = await neonClient.getWeekSchedule({ incompleteOnly, season, week });
+    const { season, week, stage } = await neonClient.getCurrentWeek();
+    const schedule = await neonClient.getWeekSchedule({ incompleteOnly, season, week, stage });
     const playerTeams = getPlayerTeams(); // teamName (uppercase) → { id }
     const mentionedIds = new Set();
     const lines = [];
 
-    const headerLine = `${incompleteOnly ? 'Remaining games' : 'Schedule'} for week ${week} of season ${season}:\n`
+    const weekText = getWeekText(week, stage);
+
+    const headerLine = `${incompleteOnly ? 'Remaining games' : 'Schedule'} for ${weekText} of season ${season}:\n`
 
     for (const game of schedule) {
         const homeTeamKey = game.homeTeamName.toUpperCase();
@@ -253,27 +255,9 @@ const processScheduleLookup = async (message, incompleteOnly = false) => {
 
 const processWeekLookup = async (message) => {
     try {
-        const { season, week } = await neonClient.getCurrentWeek();
-
-        let weekText;
-
-        if (week <= 18) {
-            weekText = `week ${week}`;
-        } else {
-            switch (week) {
-                case 19:
-                    weekText = 'the Wild Card round';
-                    break;
-                case 20:
-                    weekText = 'the Divisional round';
-                    break;
-                case 21:
-                    weekText = 'the Championship round';
-                    break;
-                default:
-                    weekText = 'the Super Bowl week';
-            }
-        }
+        const { season, week, stage } = await neonClient.getCurrentWeek();
+        
+        const weekText = getWeekText(week, stage);
 
         await message.reply(
             `${wrapInMonospace(`We are currently in ${weekText} of season ${season} as of the latest Neon Update.`)}\n${SENT_BY_OPM_BOT_TAG}`,
@@ -284,6 +268,33 @@ const processWeekLookup = async (message) => {
         await handleErrorResponse(message);
     }
 };
+
+const getWeekText = (week, stage) => {
+    let weekText;
+    
+    if (stage === 0) {
+        weekText = `Preseason week ${week}`;
+    }
+    if (week <= 18) {
+        weekText = `week ${week}`;
+    } else {
+        switch (week) {
+            case 19:
+                weekText = 'the Wild Card round';
+                break;
+            case 20:
+                weekText = 'the Divisional round';
+                break;
+            case 21:
+                weekText = 'the Championship round';
+                break;
+            default:
+                weekText = 'the Super Bowl week';
+        }
+    }
+    return weekText;
+};
+
 
 const handleInvalidMessage = async (message) => message.reply(
     `❌Unrecognized command. The following commands are supported:
