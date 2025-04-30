@@ -274,8 +274,7 @@ const getWeekText = (week, stage) => {
     
     if (stage === 0) {
         weekText = `Preseason week ${week}`;
-    }
-    if (week <= 18) {
+    } else if (week <= 18) {
         weekText = `week ${week}`;
     } else {
         switch (week) {
