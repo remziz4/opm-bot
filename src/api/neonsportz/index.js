@@ -33,6 +33,7 @@ const getCurrentWeek = async () => {
             return {
                 season: team.seasonIndex + 1,
                 week: team.weekIndex + 1,
+                stage: team.stageIndex,
             }
         } else {
             throw new Error('Invalid response format or empty data array');
@@ -47,8 +48,8 @@ const getTeamMatchup = async (teamAbbrev) => {
     const client = await getClient();
 
     try {
-        const { season, week } = await getCurrentWeek();
-        const response = await client.get(`/games/?seasonIndex=${season - 1}&weekIndex=${week -1}&team__abbrName=${teamAbbrev}&size=0`);
+        const { season, week, stage } = await getCurrentWeek();
+        const response = await client.get(`/games/?seasonIndex=${season - 1}&weekIndex=${week -1}&stageIndex=${stage}&team__abbrName=${teamAbbrev}&size=0`);
 
         return response.data.length
             ? neonGameToLightRecord(response.data[0])
@@ -62,16 +63,18 @@ const getTeamMatchup = async (teamAbbrev) => {
 const getWeekSchedule = async ({
    incompleteOnly = false,
    season,
-   week
+   week,
+   stage
 } = {}) => {
     const client = await getClient();
     if (season === undefined || week === undefined) {
         const weekInfo = await getCurrentWeek();
         season = weekInfo.season;
         week = weekInfo.week;
+        stage = weekInfo.stage;
     }
     try {
-        const response = await client.get(`/games/?seasonIndex=${season - 1}&weekIndex=${week - 1}&size=0`);
+        const response = await client.get(`/games/?seasonIndex=${season - 1}&weekIndex=${week - 1}&stageIndex=${stage}&size=0`);
         let games = response.data;
 
         if (incompleteOnly) {
