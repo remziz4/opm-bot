@@ -64,10 +64,10 @@ whatsappClient.on('ready', async () => {
     console.log('Client is ready!');
 });
 
-whatsappClient.on('message_create', (message) => {
+whatsappClient.on('message_create', async (message) => {
     try {
         if (message['_data'].id.remote === process.env.MAIN_GROUP_ID) {
-            handleMainChatMessage(message);
+            await handleMainChatMessage(message);
         }
     } catch (err) {
         console.error('Failed to process message: ', err);
