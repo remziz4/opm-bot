@@ -62,6 +62,7 @@ whatsappClient.on('qr', (qr) => {
 
 whatsappClient.on('ready', async () => {
     console.log('Client is ready!');
+    await whatsappClient.sendPresenceUnavailable();
 });
 
 whatsappClient.on('message_create', async (message) => {
