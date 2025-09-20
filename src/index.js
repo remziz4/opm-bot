@@ -62,7 +62,14 @@ whatsappClient.on('qr', (qr) => {
 
 whatsappClient.on('ready', async () => {
     console.log('Client is ready!');
-    // await whatsappClient.sendPresenceUnavailable();
+    while (true) {
+        try {
+            await whatsappClient.sendPresenceUnavailable();
+        } catch (err) {
+            console.error("Error setting whatsapp status offline:", err);
+        }
+        await new Promise(resolve => setTimeout(resolve, 20000)); // wait 20 seconds
+    }
 });
 
 whatsappClient.on('message_create', async (message) => {
