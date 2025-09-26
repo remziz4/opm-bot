@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -ex
 
 run_steps() {
     # Step 1: Import league info
@@ -10,7 +10,7 @@ run_steps() {
     sleep 20
 
     # Step 3a: Get teams (size=1)
-    TEAM_JSON=$(curl -s -X GET "https://neonsportz.com/api/leagues/OPM/teams?size=1")
+    TEAM_JSON=$(curl -s 'https://neonsportz.com/api/leagues/OPM/teams/?size=1')
 
     # Step 3b: Extract weekIndex
     WEEK_INDEX=$(echo "$TEAM_JSON" | jq -r '.results[0].weekIndex')
