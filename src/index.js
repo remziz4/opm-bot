@@ -49,7 +49,8 @@ export const whatsappClient = new WhatsAppClient({
     puppeteer: {
         headless: true,
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    }
+    },
+    authTimeoutMs: 120_000,
 });
 
 whatsappClient.on('qr', (qr) => {
