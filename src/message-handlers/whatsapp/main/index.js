@@ -78,7 +78,7 @@ const processEmbeddedMessage = async (message) => {
     }));
 
     if (teamMentions.length) {
-        const senderContact = await message.getContact();
+        const senderContact = await whatsappClient.getContactById(message.from);
         const senderMention = `@${senderContact.id.user}`;
         const senderId = senderContact.id._serialized;
 
@@ -95,7 +95,7 @@ const processEmbeddedMessage = async (message) => {
 
 const processOpponentLookup = async (message) => {
     const { _data: data } = message;
-    const senderContact = await message.getContact();
+    const senderContact = await whatsappClient.getContactById(message.from);
     const senderId = senderContact.id.user;
 
     const playerTeams = getPlayerTeams();

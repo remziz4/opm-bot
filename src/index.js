@@ -45,12 +45,10 @@ discordClient.login(token);
 
 /* WhatsApp Configuration */
 export const whatsappClient = new WhatsAppClient({
-    authStrategy: new LocalAuth(),
     puppeteer: {
         headless: true,
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
     },
-    authTimeoutMs: 120_000,
 });
 
 whatsappClient.on('qr', (qr) => {
