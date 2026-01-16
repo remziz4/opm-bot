@@ -1,4 +1,3 @@
-import { sendMessageToRecipients } from '../../../api/whatsapp/index.js';
 import { NFL_TEAM_EMOJIS } from '../../../data/teams/index.js';
 import { BOT_NOTICE } from "../../../util/constants/index.js";
 
@@ -71,7 +70,8 @@ export default async (message) => {
 
     const whatsappMessage = constructWhatsAppMessage(messageDetails);
     const messageRecipients = `${process.env.WHATSAPP_TRADE_UPDATE_RECIPIENTS}`.split(',');
-    await sendMessageToRecipients(messageRecipients, whatsappMessage);
+    // TODO: Send message via waha client
+    // await sendMessageToRecipients(messageRecipients, whatsappMessage);
     console.log(`Sent message to WhatsApp\n: ${whatsappMessage}`);
 
 };

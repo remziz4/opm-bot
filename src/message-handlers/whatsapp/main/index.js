@@ -1,9 +1,9 @@
 import fs from 'fs';
 import path from 'path';
-import { whatsappClient } from "../../../index.js";
 import neonClient from "../../../api/neonsportz/index.js";
 import {NFL_TEAM_CITY_ABBREVIATIONS, NFL_TEAM_EMOJIS, teamAliases} from "../../../data/teams/index.js";
-import {wrapInMonospace} from "../../../util/string/index.js";
+import { wrapInMonospace } from "../../../util/string/index.js";
+import wahaClient from '../../../api/whatsapp/index.js';
 
 const SENT_BY_OPM_BOT_TAG = '(Sent by OPM-Bot 🤖)';
 
@@ -42,35 +42,34 @@ const detectMessageType = (msg) => {
     return 'standard';
 };
 
-const processTeamLookupRequest = async (message) => {
-    const { _data: data } = message;
-    const teamName = teamAliases.get(data.body.substring(1).toUpperCase());
+const processTeamLookupRequest = async (req) => {
+    const teamName = teamAliases.get(req.message.content.substring(1).toUpperCase());
     const playerTeamRecord = getPlayerTeams()[teamName];
     if (playerTeamRecord) {
-        const teamContact = await whatsappClient.getContactById(playerTeamRecord.id);
-        const messageContent = `${wrapInMonospace(`@${teamContact.id.user} ${NFL_TEAM_EMOJIS[teamName]}`)}\n${SENT_BY_OPM_BOT_TAG}`;
-        message.reply(
-            messageContent,
-            message['_data'].id.remote,
-            { mentions: [teamContact.id['_serialized']]}
-        );
+        const messageContent = `${wrapInMonospace(`@${trimIdSuffix(playerTeamRecord.id)} ${NFL_TEAM_EMOJIS[teamName]}`)}\n${SENT_BY_OPM_BOT_TAG}`;
+        await wahaClient.sendMessage({
+            chatId: req.chatId,
+            text: messageContent,
+            replyInfo: { senderId: req.senderId, messageId: req.message.id },
+            mentions: [playerTeamRecord.id],
+
+        });
     }
 }
 
-const processEmbeddedMessage = async (message) => {
-    const { _data: data } = message;
+const processEmbeddedMessage = async (req) => {
     const playerTeams = getPlayerTeams();
     const teamMentions = [];
 
-    const parts = data.body.split(/(\s+)/);
+    const parts = req.message.content.split(/(\s+)/);
     const processedParts = await Promise.all(parts.map(async (part) => {
         if (part.match(/^!\w{2,}/)) {
             const teamName = teamAliases.get(part.substring(1).toUpperCase());
             const teamRecord = playerTeams[teamName];
             if (teamRecord) {
-                const teamContact = await whatsappClient.getContactById(teamRecord.id);
-                const mention = `@${teamContact.id.user} ${NFL_TEAM_EMOJIS[teamName]}`;
-                teamMentions.push(teamContact.id._serialized);
+                const teamContact = teamRecord.id;
+                const mention = `@${trimIdSuffix(teamContact)} ${NFL_TEAM_EMOJIS[teamName]}`;
+                teamMentions.push(teamContact);
                 return mention;
             }
         }
@@ -78,33 +77,31 @@ const processEmbeddedMessage = async (message) => {
     }));
 
     if (teamMentions.length) {
-        const senderContact = await whatsappClient.getContactById(message.from);
-        const senderMention = `@${senderContact.id.user}`;
-        const senderId = senderContact.id._serialized;
+        const senderMention = `@${req.senderId}`;
 
         // Add the sender to mentions too, so their @ works
-        if (!teamMentions.includes(senderId)) {
-            teamMentions.unshift(senderId);
+        if (!teamMentions.includes(req.senderId)) {
+            teamMentions.unshift(req.senderId);
         }
 
-        const processedMessage = `${senderMention} says (via OPM-Bot 🤖):\n${wrapInMonospace(processedParts.join(''))}`;
-
-        message.reply(processedMessage, data.id.remote, { mentions: teamMentions });
+        const processedMessage = `${trimIdSuffix(senderMention)} says (via OPM-Bot 🤖):\n${wrapInMonospace(processedParts.join(''))}`;
+        await wahaClient.sendMessage({ chatId: req.chatId, mentions: teamMentions, text: processedMessage, replyInfo: { senderId: req.senderId, messageId: req.message.id } });
+        // message.reply(processedMessage, data.id.remote, { mentions: teamMentions });
     }
 };
 
-const processOpponentLookup = async (message) => {
-    const { _data: data } = message;
-    const senderContact = await whatsappClient.getContactById(message.from);
-    const senderId = senderContact.id.user;
-
+const processOpponentLookup = async (req) => {
     const playerTeams = getPlayerTeams();
     const userTeamEntry = Object.entries(playerTeams).find(([, value]) => {
-        return value.id.includes(senderId);
+        return value.id.includes(req.senderId);
     });
 
     if (!userTeamEntry) {
-        await message.reply(`Could not find your team in player_teams.json.\n\n${SENT_BY_OPM_BOT_TAG}`, data.id.remote);
+        await wahaClient.sendMessage({
+            chatId: req.chatId,
+            text: `Could not find your team in player_teams.json.\n\n${SENT_BY_OPM_BOT_TAG}`,
+            replyInfo: { senderId: req.senderId, messageId: req.message.id },
+        });
         return;
     }
 
@@ -112,31 +109,36 @@ const processOpponentLookup = async (message) => {
     const game = await neonClient.getTeamMatchup(NFL_TEAM_CITY_ABBREVIATIONS[teamName]);
 
     if (!game) {
-        await message.reply(`${teamName} have no game this week.\n\n${SENT_BY_OPM_BOT_TAG}`, data.id.remote);
+        await wahaClient.sendMessage({
+            chatId: req.chatId,
+            text: `${teamName} have no game this week.\n\n${SENT_BY_OPM_BOT_TAG}`,
+            replyInfo: { senderId: req.senderId, messageId: req.message.id }
+        });
         return;
     }
 
-    const opponentTeamName = game.homeTeamName.toUpperCase() === teamName
+    const playerIsHome = game.homeTeamName.toUpperCase() === teamName;
+
+    const opponentTeamName = playerIsHome
         ? game.awayTeamName.toUpperCase()
         : game.homeTeamName.toUpperCase();
 
     const playerTeamsMap = getPlayerTeams();
     const opponentEntry = playerTeamsMap[opponentTeamName];
-    const opponentMention = opponentEntry
-        ? (await whatsappClient.getContactById(opponentEntry.id)).id.user
-        : null;
 
-    const emoji = NFL_TEAM_EMOJIS[opponentTeamName] || '';
+    const opponentEmoji = NFL_TEAM_EMOJIS[opponentTeamName] || '';
     const teamEmoji = NFL_TEAM_EMOJIS[teamName] || '';
 
+    const scores = playerIsHome ? [game.homeScore, game.awayScore] : [game.awayScore, game.homeScore];
+
     const result = game.isComplete
-        ? `Final score: ${game.homeScore} - ${game.awayScore}`
+        ? `Final score: ${scores[0]} - ${scores[1]}`
         : 'Game has not been completed yet.';
 
-    const mentionLine = opponentMention ? `@${opponentMention}` : null;
+    const mentionLine = `@${trimIdSuffix(opponentEntry.id)}`;
 
     const monospaceBlock = wrapInMonospace([
-        `${teamName} ${teamEmoji} vs ${opponentTeamName} ${emoji}`,
+        `${teamName} ${teamEmoji} vs ${opponentTeamName} ${opponentEmoji}`,
         result,
     ].join('\n'));
 
@@ -146,14 +148,16 @@ const processOpponentLookup = async (message) => {
         SENT_BY_OPM_BOT_TAG,
     ].filter(Boolean);
 
-    await message.reply(lines.join('\n'), data.id.remote, {
-        mentions: opponentMention ? [opponentEntry.id] : [],
+    await wahaClient.sendMessage({
+        chatId: req.chatId,
+        text: lines.join('\n'),
+        mentions: [opponentEntry.id],
+        replyInfo: { senderId: req.senderId, messageId: req.message.id }
     });
 };
 
-const processStandingsLookup = async (message) => {
-    const { body } = message._data;
-    const tokens = body.trim().split(/\s+/);
+const processStandingsLookup = async (req) => {
+    const tokens = req.message.content.trim().split(/\s+/);
 
     const modifier = tokens[1]?.toLowerCase();
     const allowedModifiers = new Set([
@@ -163,10 +167,11 @@ const processStandingsLookup = async (message) => {
     ]);
 
     if (!modifier || !allowedModifiers.has(modifier)) {
-        await message.reply(
-            `⚠️ Please include a valid modifier with !standings.\n\nValid options:\n• nfl\n• afc/nfc\n• afce/afcn/afcs/afcw\n• nfce/nfcn/nfcs/nfcw\n\n${SENT_BY_OPM_BOT_TAG}`,
-            message['_data'].id.remote
-        );
+        await wahaClient.sendMessage({
+            chatId: req.chatId,
+            text: `⚠️ Please include a valid modifier with !standings.\n\nValid options:\n• nfl\n• afc/nfc\n• afce/afcn/afcs/afcw\n• nfce/nfcn/nfcs/nfcw\n\n${SENT_BY_OPM_BOT_TAG}`,
+            replyInfo: { senderId: req.senderId, messageId: req.message.id }
+        });
         return;
     }
 
@@ -186,9 +191,8 @@ const processStandingsLookup = async (message) => {
         const teamEmoji = NFL_TEAM_EMOJIS[teamKey] || '';
 
         if (playerEntry) {
-            const contact = await whatsappClient.getContactById(playerEntry.id);
-            mentions.add(contact.id._serialized);
-            lines.push(`${lineNumber}. @${contact.id.user} (${teamKey} ${teamEmoji}) - ${team.record}`);
+            mentions.add(playerEntry.id);
+            lines.push(`${lineNumber}. @${trimIdSuffix(playerEntry.id)} (${teamKey} ${teamEmoji}) - ${team.record}`);
         } else {
             lines.push(`${lineNumber}. ${teamKey} ${teamEmoji} - ${team.record}`);
         }
@@ -196,13 +200,15 @@ const processStandingsLookup = async (message) => {
 
     const standingsText = wrapInMonospace(lines.join('\n')) + `\n\n${SENT_BY_OPM_BOT_TAG}`;
 
-    await message.reply(standingsText, message['_data'].id.remote, {
-        mentions: Array.from(mentions),
+    await wahaClient.sendMessage({
+        chatId: req.chatId,
+        text: standingsText,
+        replyInfo: { senderId: req.senderId, messageId: req.message.id },
+        mentions: Array.from(mentions)
     });
 };
 
-const processScheduleLookup = async (message, incompleteOnly = false) => {
-    const { _data: data } = message;
+const processScheduleLookup = async (req, incompleteOnly = false) => {
     const { season, week, stage } = await neonClient.getCurrentWeek();
     const schedule = await neonClient.getWeekSchedule({ incompleteOnly, season, week, stage });
     const playerTeams = getPlayerTeams(); // teamName (uppercase) → { id }
@@ -220,18 +226,11 @@ const processScheduleLookup = async (message, incompleteOnly = false) => {
         const homePlayer = playerTeams[homeTeamKey];
         const awayPlayer = playerTeams[awayTeamKey];
 
-        const homeContact = homePlayer
-            ? await whatsappClient.getContactById(homePlayer.id)
-            : null;
-        const awayContact = awayPlayer
-            ? await whatsappClient.getContactById(awayPlayer.id)
-            : null;
+        const homeTag = homePlayer ? `@${trimIdSuffix(homePlayer.id)}` : game.homeTeamName;
+        const awayTag = awayPlayer ? `@${trimIdSuffix(awayPlayer.id)}` : game.awayTeamName;
 
-        const homeTag = homeContact ? `@${homeContact.id.user}` : game.homeTeamName;
-        const awayTag = awayContact ? `@${awayContact.id.user}` : game.awayTeamName;
-
-        if (homeContact) mentionedIds.add(homeContact.id._serialized);
-        if (awayContact) mentionedIds.add(awayContact.id._serialized);
+        if (homePlayer) mentionedIds.add(homePlayer.id);
+        if (awayPlayer) mentionedIds.add(awayPlayer.id);
 
         const homeLine = `${homeTag} (${game.homeTeamName} ${NFL_TEAM_EMOJIS[homeTeamKey] || ''})`;
         const awayLine = `${awayTag} (${game.awayTeamName} ${NFL_TEAM_EMOJIS[awayTeamKey] || ''})`;
@@ -247,25 +246,29 @@ const processScheduleLookup = async (message, incompleteOnly = false) => {
         wrapInMonospace(headerLine + lines.join('\n\n'))
         + `\n\n${SENT_BY_OPM_BOT_TAG}`;
 
-    await message.reply(messageBody, data.id.remote, {
+    await wahaClient.sendMessage({
+        chatId: req.chatId,
+        text: messageBody,
         mentions: Array.from(mentionedIds),
+        replyInfo: { senderId: req.senderId, messageId: req.message.id }
     });
 };
 
 
-const processWeekLookup = async (message) => {
+const processWeekLookup = async (req) => {
     try {
         const { season, week, stage } = await neonClient.getCurrentWeek();
         
         const weekText = getWeekText(week, stage);
 
-        await message.reply(
-            `${wrapInMonospace(`We are currently in ${weekText} of season ${season} as of the latest Neon Update.`)}\n${SENT_BY_OPM_BOT_TAG}`,
-            message['_data'].id.remote,
-        );
+        await wahaClient.sendMessage({
+            chatId: req.chatId,
+            text: `${wrapInMonospace(`We are currently in ${weekText} of season ${season} as of the latest Neon Update.`)}\n${SENT_BY_OPM_BOT_TAG}`,
+            replyInfo: { senderId: req.senderId, messageId: req.message.id }
+        });
     } catch (err) {
         console.error('Error looking up current week', err);
-        await handleErrorResponse(message);
+        await handleErrorResponse(req);
     }
 };
 
@@ -294,9 +297,8 @@ const getWeekText = (week, stage) => {
     return weekText;
 };
 
-
-const handleInvalidMessage = async (message) => message.reply(
-    `❌Unrecognized command. The following commands are supported:
+const handleInvalidMessage = async (req) => {
+    const errorText = `❌Unrecognized command. The following commands are supported:
 
 !teamName (ex: !commanders, !was)
 !opponent
@@ -305,44 +307,48 @@ const handleInvalidMessage = async (message) => message.reply(
 !standings
 !week
     
-${SENT_BY_OPM_BOT_TAG}`,
-    message['_data'].id.remote,
-);
+${SENT_BY_OPM_BOT_TAG}`;
 
-const handleErrorResponse = async (message) => message.reply(
-    `❌Something went wrong processing this request.
-    
-${SENT_BY_OPM_BOT_TAG}`,
-    message['_data'].id.remote,
-);
+  await wahaClient.sendMessage({
+      chatId: req.chatId,
+      text: errorText,
+      replyInfo: { senderId: req.senderId, messageId: req.message.id }
+  });
+};
 
-export default async (message) => {
-    const { _data: data } = message;
-    const messageType = detectMessageType(data.body);
+const handleErrorResponse = async (req) => wahaClient.sendMessage({
+    chatId: req.chatId,
+    text: `⚠️ An error occurred while processing your request. Please try again later.\n\n${SENT_BY_OPM_BOT_TAG}`,
+    replyInfo: { senderId: req.senderId, messageId: req.message.id }
+});
 
+export default async (req) => {
+    const messageType = detectMessageType(req.message.content);
     switch (messageType) {
         case 'embedded':
-            await processEmbeddedMessage(message);
+            await processEmbeddedMessage(req);
             break;
         case 'team-lookup':
-            await processTeamLookupRequest(message);
+            await processTeamLookupRequest(req);
             break;
         case 'opponent':
-            await processOpponentLookup(message);
+            await processOpponentLookup(req);
             break;
         case 'remaining':
-            await processScheduleLookup(message, true);
+            await processScheduleLookup(req, true);
             break;
         case 'schedule':
-            await processScheduleLookup(message);
+            await processScheduleLookup(req);
             break;
         case 'standings':
-            await processStandingsLookup(message);
+            await processStandingsLookup(req);
             break;
         case 'week':
-            await processWeekLookup(message);
+            await processWeekLookup(req);
             break;
         case 'invalid':
-            await handleInvalidMessage(message);
+            await handleInvalidMessage(req);
     }
 };
+
+const trimIdSuffix = (id) => id.replace(/@[^@]*$/, '');

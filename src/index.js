@@ -1,11 +1,12 @@
 import { Client as DiscordClient, GatewayIntentBits } from 'discord.js';
-import whatsAppWeb from 'whatsapp-web.js';
-import QRCode from 'qrcode';
+import express from 'express';
 import dotenv from 'dotenv';
-import { handleAnnouncement, handleTrade } from './message-handlers/discord/index.js';
-import {handleMainChatMessage} from "./message-handlers/whatsapp/index.js";
+import wahaClient from './api/whatsapp/index.js';
+// import { handleAnnouncement, handleTrade } from './message-handlers/discord/index.js';
+import { handleMainChatMessage } from "./message-handlers/whatsapp/index.js";
 
-const { Client: WhatsAppClient, LocalAuth } = whatsAppWeb;
+const app = express();
+app.use(express.json());
 
 dotenv.config();
 
@@ -24,7 +25,7 @@ const getDiscordChannelIds = () => ({
 });
 
 discordClient.once('ready', () => {
-    console.log(`Logged in as ${discordClient.user.tag}!`);
+    console.log(`Authenticated to Discord as ${discordClient.user.tag}!`);
 });
 
 discordClient.on('messageCreate', (message) => {
@@ -32,10 +33,10 @@ discordClient.on('messageCreate', (message) => {
         const channelIds = getDiscordChannelIds();
         switch(message.channel.id) {
             case channelIds.announcements:
-                handleAnnouncement(message);
+                //handleAnnouncement(message);
                 break;
             case channelIds.trades:
-                handleTrade(message);
+                //handleTrade(message);
         }
     }
 });
@@ -43,35 +44,25 @@ discordClient.on('messageCreate', (message) => {
 const token = process.env.DISCORD_BOT_TOKEN;
 discordClient.login(token);
 
-/* WhatsApp Configuration */
-export const whatsappClient = new WhatsAppClient({
-    puppeteer: {
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    },
-});
-
-whatsappClient.on('qr', (qr) => {
-    console.log('WhatsApp Web Client QR Code (scan this from whatsapp web to authorize this bot):')
-    QRCode.toString(qr, (err, url) => {
-        if (err) throw err;
-        console.log(url);
-    });
-});
-
-whatsappClient.on('ready', async () => {
-    console.log('Client is ready!');
-    while (true) {
-        try {
-            await whatsappClient.sendPresenceUnavailable();
-        } catch (err) {
-            console.error("Error setting whatsapp status offline:", err);
+app.post("/message", async (req, res) => {
+    try {
+        const payload = req.body.payload['_data'];
+        if (payload['Info']['Type'] === 'text') {
+            const parsedMessage = await extractMessageInfoFromPayload(payload);
+            if (parsedMessage.chatId === process.env.MAIN_GROUP_ID) {
+                handleMainChatMessage(parsedMessage);
+            }
         }
-        await new Promise(resolve => setTimeout(resolve, 20000)); // wait 20 seconds
+        res.send("OK");
+    } catch (err) {
+        console.error('Error processing webhook message: ', err);
+        console.info('Erroneous message payload: ', JSON.stringify(req.body.payload, null, 2));
     }
 });
 
-whatsappClient.on('message_create', async (message) => {
+app.listen(4000, () => console.log("Waha webhook listener is running on port 4000"));
+
+/*whatsappClient.on('message_create', async (message) => {
     try {
         if (message['_data'].id.remote === process.env.MAIN_GROUP_ID) {
             await handleMainChatMessage(message);
@@ -79,7 +70,31 @@ whatsappClient.on('message_create', async (message) => {
     } catch (err) {
         console.error('Failed to process message: ', err);
     }
-});
+});*/
 
-console.log('Initializing WhatsApp client...')
-whatsappClient.initialize();
+const extractMessageInfoFromPayload = async ({
+    Info: { AddressingMode, Chat, ID, Sender, SenderAlt },
+    Message: { conversation, extendedTextMessage }
+}) => {
+
+    let senderId;
+    if (AddressingMode !== 'lid') {
+        console.log('AddressingMode is not lid, using Sender or SenderAlt directly');
+        senderId = Sender;
+    } else if (SenderAlt.endsWith('@s.whatsapp.net')) {
+        console.log('AddressingMode is lid, but SenderAlt is a phone number, using SenderAlt');
+        senderId = SenderAlt;
+    } else {
+        console.log('Using API to fetch phone number from lid');
+        senderId = await wahaClient.getPnFromLid(Sender)
+    }
+
+    return {
+        chatId: Chat,
+        message: {
+            content: conversation ? conversation : extendedTextMessage.text,
+            id: ID,
+        },
+        senderId
+    }
+};

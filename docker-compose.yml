@@ -10,5 +10,22 @@ services:
     environment:
       - TEAM_DATA_LOCATION=/usr/src/app
     volumes:
-      - ./.wwebjs_auth:/usr/src/app/.wwebjs_auth
       - ./player_teams.json:/usr/src/app/player_teams.json
+
+  waha:
+    image: devlikeapro/waha:gows-2026.1.3
+    platform: linux/amd64
+    ports:
+      - "3000:3000"
+    environment:
+      - WHATSAPP_DEFAULT_ENGINE=GOWS
+      - WHATSAPP_START_SESSION=default
+      - WAHA_PRESENCE_AUTO_ONLINE=False
+      - WAHA_API_KEY=YOUR_WAHA_API_KEY
+      - WAHA_DASHBOARD_USERNAME=waha
+      - WAHA_DASHBOARD_PASSWORD=YOUR_WAHA_PASSWORD
+      - WHATSAPP_SWAGGER_USERNAME=waha
+      - WHATSAPP_SWAGGER_PASSWORD=YOUR_SWAGGER_PASSWORD
+    volumes:
+      - ./.waha/.sessions:/app/.sessions
+    restart: unless-stopped
