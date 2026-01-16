@@ -81,12 +81,16 @@ const extractMessageInfoFromPayload = async ({
     if (AddressingMode !== 'lid') {
         console.log('AddressingMode is not lid, using Sender or SenderAlt directly');
         senderId = Sender;
-    } else if (SenderAlt.endsWith('@s.whatsapp.net')) {
+    } else if (SenderAlt.endsWith('@s.whatsapp.net') || SenderAlt.endsWith('@c.us')) {
         console.log('AddressingMode is lid, but SenderAlt is a phone number, using SenderAlt');
         senderId = SenderAlt;
     } else {
         console.log('Using API to fetch phone number from lid');
         senderId = await wahaClient.getPnFromLid(Sender)
+    }
+
+    if (senderId.endsWith('@s.whatsapp.net')) {
+        senderId = senderId.replace('@s.whatsapp.net', '@c.us');
     }
 
     return {
