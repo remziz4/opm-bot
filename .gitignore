@@ -4,3 +4,5 @@ node_modules
 player_teams.json
 .wwebjs_auth/
 .wwebjs_cache/
+.waha
+.env.prod

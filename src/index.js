@@ -62,16 +62,6 @@ app.post("/message", async (req, res) => {
 
 app.listen(4000, () => console.log("Waha webhook listener is running on port 4000"));
 
-/*whatsappClient.on('message_create', async (message) => {
-    try {
-        if (message['_data'].id.remote === process.env.MAIN_GROUP_ID) {
-            await handleMainChatMessage(message);
-        }
-    } catch (err) {
-        console.error('Failed to process message: ', err);
-    }
-});*/
-
 const extractMessageInfoFromPayload = async ({
     Info: { AddressingMode, Chat, ID, Sender, SenderAlt },
     Message: { conversation, extendedTextMessage }
