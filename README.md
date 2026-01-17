@@ -4,6 +4,10 @@
 
 OPM-Bot is a small integration service used by the OPM Madden League to bridge three systems: the NeonSportz league API (for schedule, standings, matchups), WhatsApp (via a WAHA-compatible API), and optionally Discord. Its primary role is to accept WhatsApp messages (via a webhook), respond to lightweight commands, and send team- and league-related summaries or mentions into the league's main WhatsApp group.
 
+![Command Example #1](assets/images/embedded_command_example.png)
+![Command Example #1](assets/images/standings_command_example.png)
+![Command Example #1](assets/images/remaining_command_example.png)
+
 ## Basic Design
 
 - Input: WAHA posts webhook payloads to the bot's /message endpoint.
