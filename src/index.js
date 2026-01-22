@@ -50,7 +50,7 @@ app.post("/message", async (req, res) => {
         if (payload['Info']['Type'] === 'text') {
             const parsedMessage = await extractMessageInfoFromPayload(payload);
             if (parsedMessage.chatId === process.env.MAIN_GROUP_ID) {
-                handleMainChatMessage(parsedMessage);
+                await handleMainChatMessage(parsedMessage);
             }
         }
         res.send("OK");
