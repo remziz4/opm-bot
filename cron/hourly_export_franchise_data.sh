@@ -1,5 +1,5 @@
 #!/bin/bash
-
+# CRON ENTRY: 0 0-1,8-23 * * * /path/to/hourly_export_franchise_data.sh
 set -ex
 
 run_steps() {
