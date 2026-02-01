@@ -157,16 +157,16 @@ const processOpponentLookup = async (req) => {
 };
 
 const processStandingsLookup = async (req) => {
-    const tokens = req.message.content.trim().split(/\s+/);
+    const modifiers = req.message.content.trim().split(/\s+/).slice(1);
 
-    const modifier = tokens[1]?.toLowerCase();
+    const selection = modifiers[0]?.toLowerCase();
     const allowedModifiers = new Set([
         'nfl', 'afc', 'nfc',
         'afce', 'afcn', 'afcs', 'afcw',
         'nfce', 'nfcn', 'nfcs', 'nfcw',
     ]);
 
-    if (!modifier || !allowedModifiers.has(modifier)) {
+    if (!selection || !allowedModifiers.has(selection)) {
         await wahaClient.sendMessage({
             chatId: req.chatId,
             text: `⚠️ Please include a valid modifier with !standings.\n\nValid options:\n• nfl\n• afc/nfc\n• afce/afcn/afcs/afcw\n• nfce/nfcn/nfcs/nfcw\n\n${SENT_BY_OPM_BOT_TAG}`,
@@ -175,10 +175,12 @@ const processStandingsLookup = async (req) => {
         return;
     }
 
+    const useMentions = modifiers[1]?.toLowerCase() === 'tag';
+
     const playerTeams = getPlayerTeams();
-    const standings = modifier === 'nfl'
+    const standings = selection === 'nfl'
         ? await neonClient.getStandings()
-        : await neonClient.getStandings(modifier);
+        : await neonClient.getStandings(selection);
 
     const lines = [];
     const mentions = new Set();
@@ -191,8 +193,12 @@ const processStandingsLookup = async (req) => {
         const teamEmoji = NFL_TEAM_EMOJIS[teamKey] || '';
 
         if (playerEntry) {
-            mentions.add(playerEntry.id);
-            lines.push(`${lineNumber}. @${trimIdSuffix(playerEntry.id)} (${teamKey} ${teamEmoji}) - ${team.record}`);
+            if (useMentions) {
+                lines.push(`${lineNumber}. @${trimIdSuffix(playerEntry.id)} (${teamKey} ${teamEmoji}) - ${team.record}`);
+                mentions.add(playerEntry.id);
+            } else {
+                lines.push(`${lineNumber}. ${playerEntry.name} (${teamKey} ${teamEmoji}) - ${team.record}`);
+            }
         } else {
             lines.push(`${lineNumber}. ${teamKey} ${teamEmoji} - ${team.record}`);
         }
@@ -209,9 +215,12 @@ const processStandingsLookup = async (req) => {
 };
 
 const processScheduleLookup = async (req, incompleteOnly = false) => {
+    const [_, modifier] = req.message.content.trim().split(/\s+/);
+    const useMentions = modifier?.toLowerCase() === 'tag';
+
     const { season, week, stage } = await neonClient.getCurrentWeek();
     const schedule = await neonClient.getWeekSchedule({ incompleteOnly, season, week, stage });
-    const playerTeams = getPlayerTeams(); // teamName (uppercase) → { id }
+    const playerTeams = getPlayerTeams(); // teamName (uppercase) → { id, name }
     const mentionedIds = new Set();
     const lines = [];
 
@@ -226,11 +235,17 @@ const processScheduleLookup = async (req, incompleteOnly = false) => {
         const homePlayer = playerTeams[homeTeamKey];
         const awayPlayer = playerTeams[awayTeamKey];
 
-        const homeTag = homePlayer ? `@${trimIdSuffix(homePlayer.id)}` : game.homeTeamName;
-        const awayTag = awayPlayer ? `@${trimIdSuffix(awayPlayer.id)}` : game.awayTeamName;
+        const homeTag = useMentions && homePlayer
+            ? `@${trimIdSuffix(homePlayer.id)}`
+            : homePlayer?.name ?? game.homeTeamName;
+        const awayTag = useMentions && awayPlayer
+            ? `@${trimIdSuffix(awayPlayer.id)}`
+            : awayPlayer?.name ?? game.awayTeamName;
 
-        if (homePlayer) mentionedIds.add(homePlayer.id);
-        if (awayPlayer) mentionedIds.add(awayPlayer.id);
+        if (useMentions) {
+            if (homePlayer) mentionedIds.add(homePlayer.id);
+            if (awayPlayer) mentionedIds.add(awayPlayer.id);
+        }
 
         const homeLine = `${homeTag} (${game.homeTeamName} ${NFL_TEAM_EMOJIS[homeTeamKey] || ''})`;
         const awayLine = `${awayTag} (${game.awayTeamName} ${NFL_TEAM_EMOJIS[awayTeamKey] || ''})`;
