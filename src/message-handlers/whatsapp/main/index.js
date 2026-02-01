@@ -215,10 +215,14 @@ const processStandingsLookup = async (req) => {
 };
 
 const processScheduleLookup = async (req, incompleteOnly = false) => {
-    const [_, modifier] = req.message.content.trim().split(/\s+/);
-    const useMentions = modifier?.toLowerCase() === 'tag';
+    const modifiers = req.message.content.trim().split(/\s+/).slice(1);
 
-    const { season, week, stage } = await neonClient.getCurrentWeek();
+    const useMentions = Boolean(modifiers.find(mod => mod.toLowerCase() === 'tag'));
+    const weekOverride = modifiers.find(mod => !isNaN(parseInt(mod)));
+
+    let { season, week, stage } = await neonClient.getCurrentWeek();
+    if (weekOverride) week = weekOverride;
+
     const schedule = await neonClient.getWeekSchedule({ incompleteOnly, season, week, stage });
     const playerTeams = getPlayerTeams(); // teamName (uppercase) → { id, name }
     const mentionedIds = new Set();
