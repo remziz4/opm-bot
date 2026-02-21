@@ -10,6 +10,8 @@ app.use(express.json());
 
 dotenv.config();
 
+const SERVER_START_TIME = Math.floor(Date.now() / 1000);
+
 /* Discord Configuration */
 const discordClient = new DiscordClient({
     intents: [
@@ -47,11 +49,20 @@ discordClient.login(token);
 app.post("/message", async (req, res) => {
     try {
         const payload = req.body.payload['_data'];
-        if (payload['Info']['Type'] === 'text') {
+        const messageTimestamp = payload?.['Info']?.['Timestamp'];
+
+        let isoTimestamp;
+        if (messageTimestamp) {
+            isoTimestamp = Math.floor(new Date(messageTimestamp).getTime() / 1000);
+        }
+
+        if (
+            isoTimestamp > SERVER_START_TIME &&
+            payload?.['Info']?.['Chat'] === process.env.MAIN_GROUP_ID &&
+            payload?.['Info']?.['Type'] === 'text'
+        ) {
             const parsedMessage = await extractMessageInfoFromPayload(payload);
-            if (parsedMessage.chatId === process.env.MAIN_GROUP_ID) {
-                await handleMainChatMessage(parsedMessage);
-            }
+            await handleMainChatMessage(parsedMessage);
         }
         res.send("OK");
     } catch (err) {
