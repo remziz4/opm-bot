@@ -45,14 +45,24 @@ const detectMessageType = (msg) => {
 const processTeamLookupRequest = async (req) => {
     const teamName = teamAliases.get(req.message.content.substring(1).toUpperCase());
     const playerTeamRecord = getPlayerTeams()[teamName];
-    if (playerTeamRecord) {
+    if (playerTeamRecord?.id) {
         const messageContent = `${wrapInMonospace(`@${trimIdSuffix(playerTeamRecord.id)} ${NFL_TEAM_EMOJIS[teamName]}`)}\n${SENT_BY_OPM_BOT_TAG}`;
         await wahaClient.sendMessage({
             chatId: req.chatId,
             text: messageContent,
-            replyInfo: { senderId: req.senderId, messageId: req.message.id },
+            replyInfo: {senderId: req.senderId, messageId: req.message.id},
             mentions: [playerTeamRecord.id],
 
+        });
+    } else if (playerTeamRecord?.name) {
+        await wahaClient.sendMessage({
+            chatId: req.chatId,
+            text: `${wrapInMonospace(`${playerTeamRecord.name} ${NFL_TEAM_EMOJIS[teamName]} (No whatsapp user linked)`)}\n${SENT_BY_OPM_BOT_TAG}`,
+        });
+    } else {
+        await wahaClient.sendMessage({
+            chatId: req.chatId,
+            text: `${wrapInMonospace(`No player assigned to ${teamName}.`)}\n${SENT_BY_OPM_BOT_TAG}`,
         });
     }
 }
@@ -66,11 +76,15 @@ const processEmbeddedMessage = async (req) => {
         if (part.match(/^!\w{2,}/)) {
             const teamName = teamAliases.get(part.substring(1).toUpperCase());
             const teamRecord = playerTeams[teamName];
-            if (teamRecord) {
+            if (teamRecord?.id) {
                 const teamContact = teamRecord.id;
                 const mention = `@${trimIdSuffix(teamContact)} ${NFL_TEAM_EMOJIS[teamName]}`;
                 teamMentions.push(teamContact);
                 return mention;
+            } else if (teamRecord?.name) {
+                return `${teamRecord.name} ${NFL_TEAM_EMOJIS[teamName]}`;
+            } else {
+                return `${teamName} (No user)`;
             }
         }
         return part;
@@ -239,20 +253,24 @@ const processScheduleLookup = async (req, incompleteOnly = false) => {
         const homePlayer = playerTeams[homeTeamKey];
         const awayPlayer = playerTeams[awayTeamKey];
 
-        const homeTag = useMentions && homePlayer
-            ? `@${trimIdSuffix(homePlayer.id)}`
-            : homePlayer?.name ?? game.homeTeamName;
-        const awayTag = useMentions && awayPlayer
-            ? `@${trimIdSuffix(awayPlayer.id)}`
-            : awayPlayer?.name ?? game.awayTeamName;
+        let homeLabel, awayLabel;
 
-        if (useMentions) {
-            if (homePlayer) mentionedIds.add(homePlayer.id);
-            if (awayPlayer) mentionedIds.add(awayPlayer.id);
+        if (useMentions && homePlayer?.id) {
+            homeLabel = `@${trimIdSuffix(homePlayer.id)}`
+            mentionedIds.add(homePlayer.id);
+        } else {
+            homeLabel = homePlayer?.name ?? 'No User';
         }
 
-        const homeLine = `${homeTag} (${game.homeTeamName} ${NFL_TEAM_EMOJIS[homeTeamKey] || ''})`;
-        const awayLine = `${awayTag} (${game.awayTeamName} ${NFL_TEAM_EMOJIS[awayTeamKey] || ''})`;
+        if (useMentions && awayPlayer?.id) {
+            awayLabel = `@${trimIdSuffix(awayPlayer.id)}`;
+            mentionedIds.add(awayPlayer.id);
+        } else {
+            awayLabel = awayPlayer?.name ?? 'No User';
+        }
+
+        const homeLine = `${homeLabel} (${game.homeTeamName} ${NFL_TEAM_EMOJIS[homeTeamKey] || ''})`;
+        const awayLine = `${awayLabel} (${game.awayTeamName} ${NFL_TEAM_EMOJIS[awayTeamKey] || ''})`;
 
         const scoreLine = game.isComplete
             ? ` [${game.homeScore} - ${game.awayScore}]`
