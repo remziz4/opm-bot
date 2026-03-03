@@ -107,7 +107,7 @@ const processEmbeddedMessage = async (req) => {
 const processOpponentLookup = async (req) => {
     const playerTeams = getPlayerTeams();
     const userTeamEntry = Object.entries(playerTeams).find(([, value]) => {
-        return value.id.includes(req.senderId);
+        return value?.id?.includes(req.senderId);
     });
 
     if (!userTeamEntry) {
