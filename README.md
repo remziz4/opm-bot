@@ -16,12 +16,12 @@ OPM-Bot is a small integration service used by the OPM Madden League to bridge t
   - NeonSportz API for schedule, standings, and matchup lookups.
   - WAHA API for translating lids to phone numbers and for sending messages back to WhatsApp groups.
   - (Optional) Discord: listens for select messages to prepare WhatsApp summaries.
-- Data: Local JSON mapping (player_teams.json) maps team identifiers / aliases to WhatsApp contact ids for mentions.
+- Data: SQLite database (`data/opm.db`) stores team→owner mappings and the admin list. On first run the database is seeded from `player_teams.json`.
 
 ## Getting started
 1. Clone the repo.
 2. Copy the `.env.example` to `.env` and fill in values.
-3. Ensure `player_teams.json` exists and contains mappings from team keys to WhatsApp contact ids.
+3. Ensure `player_teams.json` exists and contains the initial team→owner mappings (used for the one-time DB seed).
 4. Run the bot and dependencies via `docker compose up --build` (alternatively, the app itself can be run locally via `yarn start` after installing dependencies).
 5. The Waha container will output a QR code to scan with WhatsApp to link the bot.
 
@@ -30,15 +30,31 @@ The bot listens for incoming WAHA webhook POSTs (default in code: port 4000 at /
 ## Preferred tooling
 This project uses Yarn in the Dockerfile and the development workflow favors Yarn. Use Yarn for installs and scripts unless you have a specific reason to use npm. The repository is compatible with npm but Yarn is recommended.
 
-## Data: `player_teams.json`
-The bot uses a JSON file that maps team keys or aliases to contact data (at minimum a WhatsApp id). Place the file at the path referenced by `TEAM_DATA_LOCATION` or mount it into a container. A minimal example:
+## Data: SQLite database
+Team→owner mappings and the admin list are stored in a SQLite database (`data/opm.db`), which is volume-mounted so it persists across container restarts.
 
-```json
-{
-  "COMMANDERS": { "id": "15555551234@c.us" },
-  "COWBOYS": { "id": "15555559876@c.us" },
-  ...
-}
+On first run, the `player_teams` table is seeded from `player_teams.json`. After that, all changes should go through the `!assign` command or directly via the SQLite CLI:
+
+```sh
+# From the host (volume-mounted)
+sqlite3 ./data/opm.db
+
+# Or from inside the container
+docker exec -it opm-bot-app-1 sqlite3 /usr/src/app/data/opm.db
+```
+
+### Managing admins
+Admins are the only users permitted to run the `!assign` command. Add or remove them directly in the database:
+
+```sql
+-- Add an admin
+INSERT INTO admins (whatsapp_id) VALUES ('15555551234@c.us');
+
+-- Remove an admin
+DELETE FROM admins WHERE whatsapp_id = '15555551234@c.us';
+
+-- List admins
+SELECT * FROM admins;
 ```
 
 ## Usage: commands and behavior
@@ -56,13 +72,35 @@ Users interact with the bot in the WhatsApp main group. Commands are short, star
 - `!schedule` — Shows the full schedule for the current week.
 - `!standings <modifier>` — Displays standings; modifiers: `nfl`, `afc`, `nfc`, or division codes like `afce`, `nfcn`, etc.
 - `!week` — Replies with the current week and stage from NeonSportz.
+- `!assign` — (Admin only) Assigns a WhatsApp user to a team. See below.
+
+### `!assign` command
+Admins can assign or reassign team owners without any server access or restart. Any previous assignment for that WhatsApp user is automatically cleared.
+
+**Single assignment:**
+```
+!assign teamName @user
+!assign teamName self
+```
+Use `self` to assign yourself (since WhatsApp doesn't allow tagging yourself).
+
+**Bulk assignment:**
+```
+!assign
+teamName1 @user1
+teamName2 @user2
+```
+
+Team names support the same aliases as other commands (e.g., `was`, `commanders`). The bot will reply with a per-line confirmation.
 
 ### Examples
 - `!was` → bot replies with the mention for the WAS team owner and an emoji.
 - `Great game !commanders vs !packers` → bot rewrites the message to include mentions for both teams and sends it so both owners are pinged.
 - `!standings nfl` → bot posts standings for the full league.
+- `!assign bengals self` → assigns the message sender as the Bengals owner.
 
 ## Operational notes
-- The bot is designed to be low-maintenance. Keep `player_teams.json` up to date as owner phone numbers change.
+- Team→owner mappings are managed via `!assign` in the WhatsApp group — no server access or restart required.
+- The SQLite database is stored in `./data/opm.db` on the host and persists across restarts and image rebuilds.
 - The WAHA service must be reachable from the bot; for local testing you can run a WAHA container and configure the bot to call it.
 - Error handling: network or API failures are logged; transient failures can be retried by re-sending the user's command.

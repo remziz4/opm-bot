@@ -35,6 +35,26 @@ const getPnFromLid = async (lid) => {
     }
 };
 
+const resolveToPhoneId = async (rawNumber) => {
+    try {
+        const pn = await getPnFromLid(`${rawNumber}@lid`);
+        return pn.replace('@s.whatsapp.net', '@c.us');
+    } catch (err) {
+        console.warn(`LID resolution failed for ${rawNumber}@lid:`, err.message);
+        return `${rawNumber}@c.us`;
+    }
+};
+
+const getContactName = async (whatsappId) => {
+    const client = await getClient();
+    try {
+        const { data } = await client.get(`/api/${SESSION}/contacts/${encodeURIComponent(whatsappId)}`);
+        return data?.pushname;
+    } catch {
+        return null;
+    }
+};
+
 const sendMessage = async ({ chatId, text, mentions, replyInfo }) => {
     const url = '/api/sendText';
 
@@ -62,5 +82,7 @@ const sendMessage = async ({ chatId, text, mentions, replyInfo }) => {
 
 export default {
     getPnFromLid,
+    resolveToPhoneId,
+    getContactName,
     sendMessage
 }

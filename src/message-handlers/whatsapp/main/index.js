@@ -2,11 +2,11 @@ import neonClient from "../../../api/neonsportz/index.js";
 import {NFL_TEAM_CITY_ABBREVIATIONS, NFL_TEAM_EMOJIS, teamAliases} from "../../../data/teams/index.js";
 import { wrapInMonospace } from "../../../util/string/index.js";
 import wahaClient from '../../../api/whatsapp/index.js';
-import { getPlayerTeams } from '../../../data/db.js';
+import { getPlayerTeams, isAdmin, assignPlayerToTeam } from '../../../data/db.js';
 
 const SENT_BY_OPM_BOT_TAG = '(Sent by OPM-Bot 🤖)';
 const CPU_CONTROLLED = 'CPU';
-const COMMANDS = ['opponent', 'remaining', 'schedule', 'standings', 'week'];
+const COMMANDS = ['opponent', 'remaining', 'schedule', 'standings', 'week', 'assign'];
 
 const detectMessageType = (msg) => {
     const trimmedMsg = msg?.trim() ?? '';
@@ -342,6 +342,68 @@ ${SENT_BY_OPM_BOT_TAG}`;
   });
 };
 
+const processAssignCommand = async (req) => {
+    if (!isAdmin(req.senderId)) {
+        await wahaClient.sendMessage({
+            chatId: req.chatId,
+            text: `⛔ You don't have permission to use this command.\n\n${SENT_BY_OPM_BOT_TAG}`,
+            replyInfo: { senderId: req.senderId, messageId: req.message.id }
+        });
+        return;
+    }
+
+    const lines = req.message.content.trim().split('\n').map(l => l.trim()).filter(Boolean);
+
+    let assignmentLines;
+    if (lines[0].toLowerCase().trim() === '!assign') {
+        assignmentLines = lines.slice(1);
+    } else {
+        const inlineContent = lines[0].replace(/^!assign\s+/i, '').trim();
+        assignmentLines = [inlineContent, ...lines.slice(1)];
+    }
+
+    if (assignmentLines.length === 0) {
+        await wahaClient.sendMessage({
+            chatId: req.chatId,
+            text: `⚠️ Usage:\n!assign TEAMNAME @user\n!assign TEAMNAME self\nor\n!assign\nTEAMNAME1 @user1\nTEAMNAME2 @user2\n\n${SENT_BY_OPM_BOT_TAG}`,
+            replyInfo: { senderId: req.senderId, messageId: req.message.id }
+        });
+        return;
+    }
+
+    const results = [];
+
+    for (const line of assignmentLines) {
+        const [teamToken, mentionToken] = line.split(/\s+/);
+
+        const teamName = teamAliases.get(teamToken?.toUpperCase());
+        if (!teamName) {
+            results.push(`⚠️ Unknown team: ${teamToken}`);
+            continue;
+        }
+
+        let whatsappId;
+        if (mentionToken?.toLowerCase() === 'self') {
+            whatsappId = req.senderId;
+        } else if (mentionToken?.startsWith('@')) {
+            whatsappId = await wahaClient.resolveToPhoneId(mentionToken.slice(1));
+        } else {
+            results.push(`⚠️ Could not parse: "${line}"`);
+            continue;
+        }
+
+        const contactName = await wahaClient.getContactName(whatsappId);
+        assignPlayerToTeam(teamName, whatsappId, contactName);
+        results.push(`✅ ${teamName} ${NFL_TEAM_EMOJIS[teamName] || ''} → ${contactName ?? whatsappId}`);
+    }
+
+    await wahaClient.sendMessage({
+        chatId: req.chatId,
+        text: results.join('\n') + `\n\n${SENT_BY_OPM_BOT_TAG}`,
+        replyInfo: { senderId: req.senderId, messageId: req.message.id }
+    });
+};
+
 const handleErrorResponse = async (req) => wahaClient.sendMessage({
     chatId: req.chatId,
     text: `⚠️ An error occurred while processing your request. Please try again later.\n\n${SENT_BY_OPM_BOT_TAG}`,
@@ -371,6 +433,9 @@ export default async (req) => {
             break;
         case 'week':
             await processWeekLookup(req);
+            break;
+        case 'assign':
+            await processAssignCommand(req);
             break;
         case 'invalid':
             await handleInvalidMessage(req);
