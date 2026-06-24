@@ -2,11 +2,11 @@ import neonClient from "../../../api/neonsportz/index.js";
 import {NFL_TEAM_CITY_ABBREVIATIONS, NFL_TEAM_EMOJIS, teamAliases} from "../../../data/teams/index.js";
 import { wrapInMonospace } from "../../../util/string/index.js";
 import wahaClient from '../../../api/whatsapp/index.js';
-import { getPlayerTeams, isAdmin, assignPlayerToTeam } from '../../../data/db.js';
+import { getPlayerTeams, isAdmin, assignPlayerToTeam, removePlayerFromTeam } from '../../../data/db.js';
 
 const SENT_BY_OPM_BOT_TAG = '(Sent by OPM-Bot 🤖)';
 const CPU_CONTROLLED = 'CPU';
-const COMMANDS = ['opponent', 'remaining', 'schedule', 'standings', 'week', 'assign'];
+const COMMANDS = ['opponent', 'remaining', 'schedule', 'standings', 'week', 'assign', 'remove'];
 
 const detectMessageType = (msg) => {
     const trimmedMsg = msg?.trim() ?? '';
@@ -404,6 +404,45 @@ const processAssignCommand = async (req) => {
     });
 };
 
+const processRemoveCommand = async (req) => {
+    if (!isAdmin(req.senderId)) {
+        await wahaClient.sendMessage({
+            chatId: req.chatId,
+            text: `⛔ You don't have permission to use this command.\n\n${SENT_BY_OPM_BOT_TAG}`,
+            replyInfo: { senderId: req.senderId, messageId: req.message.id }
+        });
+        return;
+    }
+
+    const teamTokens = req.message.content.trim().split(/\s+/).slice(1);
+
+    if (teamTokens.length === 0) {
+        await wahaClient.sendMessage({
+            chatId: req.chatId,
+            text: `⚠️ Usage: !remove TEAMNAME [TEAMNAME2 ...]\n\n${SENT_BY_OPM_BOT_TAG}`,
+            replyInfo: { senderId: req.senderId, messageId: req.message.id }
+        });
+        return;
+    }
+
+    const results = [];
+    for (const token of teamTokens) {
+        const teamName = teamAliases.get(token.toUpperCase());
+        if (!teamName) {
+            results.push(`⚠️ Unknown team: ${token}`);
+            continue;
+        }
+        removePlayerFromTeam(teamName);
+        results.push(`✅ ${teamName} ${NFL_TEAM_EMOJIS[teamName] || ''} has been unassigned.`);
+    }
+
+    await wahaClient.sendMessage({
+        chatId: req.chatId,
+        text: results.join('\n') + `\n\n${SENT_BY_OPM_BOT_TAG}`,
+        replyInfo: { senderId: req.senderId, messageId: req.message.id }
+    });
+};
+
 const handleErrorResponse = async (req) => wahaClient.sendMessage({
     chatId: req.chatId,
     text: `⚠️ An error occurred while processing your request. Please try again later.\n\n${SENT_BY_OPM_BOT_TAG}`,
@@ -436,6 +475,9 @@ export default async (req) => {
             break;
         case 'assign':
             await processAssignCommand(req);
+            break;
+        case 'remove':
+            await processRemoveCommand(req);
             break;
         case 'invalid':
             await handleInvalidMessage(req);

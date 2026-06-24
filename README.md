@@ -73,6 +73,7 @@ Users interact with the bot in the WhatsApp main group. Commands are short, star
 - `!standings <modifier>` — Displays standings; modifiers: `nfl`, `afc`, `nfc`, or division codes like `afce`, `nfcn`, etc.
 - `!week` — Replies with the current week and stage from NeonSportz.
 - `!assign` — (Admin only) Assigns a WhatsApp user to a team. See below.
+- `!remove` — (Admin only) Removes the assigned owner from one or more teams. See below.
 
 ### `!assign` command
 Admins can assign or reassign team owners without any server access or restart. Any previous assignment for that WhatsApp user is automatically cleared.
@@ -93,11 +94,22 @@ teamName2 @user2
 
 Team names support the same aliases as other commands (e.g., `was`, `commanders`). The bot will reply with a per-line confirmation.
 
+### `!remove` command
+Admins can unassign the owner from one or more teams in a single command:
+
+```
+!remove teamName
+!remove teamName1 teamName2 teamName3
+```
+
+The bot replies with a per-team confirmation. Team name aliases are supported.
+
 ### Examples
 - `!was` → bot replies with the mention for the WAS team owner and an emoji.
 - `Great game !commanders vs !packers` → bot rewrites the message to include mentions for both teams and sends it so both owners are pinged.
 - `!standings nfl` → bot posts standings for the full league.
 - `!assign bengals self` → assigns the message sender as the Bengals owner.
+- `!remove dolphins jets patriots` → unassigns all three teams in one command.
 
 ## Operational notes
 - Team→owner mappings are managed via `!assign` in the WhatsApp group — no server access or restart required.
