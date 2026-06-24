@@ -1,22 +1,12 @@
-import fs from 'fs';
-import path from 'path';
 import neonClient from "../../../api/neonsportz/index.js";
 import {NFL_TEAM_CITY_ABBREVIATIONS, NFL_TEAM_EMOJIS, teamAliases} from "../../../data/teams/index.js";
 import { wrapInMonospace } from "../../../util/string/index.js";
 import wahaClient from '../../../api/whatsapp/index.js';
+import { getPlayerTeams } from '../../../data/db.js';
 
 const SENT_BY_OPM_BOT_TAG = '(Sent by OPM-Bot 🤖)';
-
+const CPU_CONTROLLED = 'CPU';
 const COMMANDS = ['opponent', 'remaining', 'schedule', 'standings', 'week'];
-
-const getPlayerTeams = () => {
-    const filePath = path.join(process.env.TEAM_DATA_LOCATION, 'player_teams.json');
-    console.log('reading file from: ', filePath);
-    const data = fs.readFileSync(filePath, 'utf8');
-    const obj = JSON.parse(data);
-    console.log(`read ${Object.keys(obj).length} keys from player_teams.json`);
-    return obj;
-}
 
 const detectMessageType = (msg) => {
     const trimmedMsg = msg?.trim() ?? '';
@@ -84,7 +74,7 @@ const processEmbeddedMessage = async (req) => {
             } else if (teamRecord?.name) {
                 return `${teamRecord.name} ${NFL_TEAM_EMOJIS[teamName]}`;
             } else {
-                return `${teamName} (No user)`;
+                return `${teamName} (${CPU_CONTROLLED})`;
             }
         }
         return part;
@@ -113,7 +103,7 @@ const processOpponentLookup = async (req) => {
     if (!userTeamEntry) {
         await wahaClient.sendMessage({
             chatId: req.chatId,
-            text: `Could not find your team in player_teams.json.\n\n${SENT_BY_OPM_BOT_TAG}`,
+            text: `Unable to find a team assigned to this whatsapp contact.\n\n${SENT_BY_OPM_BOT_TAG}`,
             replyInfo: { senderId: req.senderId, messageId: req.message.id },
         });
         return;
@@ -137,8 +127,7 @@ const processOpponentLookup = async (req) => {
         ? game.awayTeamName.toUpperCase()
         : game.homeTeamName.toUpperCase();
 
-    const playerTeamsMap = getPlayerTeams();
-    const opponentEntry = playerTeamsMap[opponentTeamName];
+    const opponentEntry = playerTeams[opponentTeamName];
 
     const opponentEmoji = NFL_TEAM_EMOJIS[opponentTeamName] || '';
     const teamEmoji = NFL_TEAM_EMOJIS[teamName] || '';
@@ -259,14 +248,14 @@ const processScheduleLookup = async (req, incompleteOnly = false) => {
             homeLabel = `@${trimIdSuffix(homePlayer.id)}`
             mentionedIds.add(homePlayer.id);
         } else {
-            homeLabel = homePlayer?.name ?? 'No User';
+            homeLabel = homePlayer?.name ?? CPU_CONTROLLED;
         }
 
         if (useMentions && awayPlayer?.id) {
             awayLabel = `@${trimIdSuffix(awayPlayer.id)}`;
             mentionedIds.add(awayPlayer.id);
         } else {
-            awayLabel = awayPlayer?.name ?? 'No User';
+            awayLabel = awayPlayer?.name ?? CPU_CONTROLLED;
         }
 
         const homeLine = `${homeLabel} (${game.homeTeamName} ${NFL_TEAM_EMOJIS[homeTeamKey] || ''})`;

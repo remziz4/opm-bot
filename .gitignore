@@ -1,5 +1,6 @@
 .env
 node_modules
+data/
 .idea
 player_teams.json
 .wwebjs_auth/

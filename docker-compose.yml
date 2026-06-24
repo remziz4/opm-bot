@@ -9,8 +9,10 @@ services:
       - .env
     environment:
       - TEAM_DATA_LOCATION=/usr/src/app
+      - DB_PATH=/usr/src/app/data/opm.db
     volumes:
       - ./player_teams.json:/usr/src/app/player_teams.json
+      - ./data:/usr/src/app/data
 
   waha:
     image: devlikeapro/waha:gows-2026.5.1
