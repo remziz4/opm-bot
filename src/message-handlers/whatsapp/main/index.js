@@ -221,13 +221,21 @@ const processScheduleLookup = async (req, incompleteOnly = false) => {
     const modifiers = req.message.content.trim().split(/\s+/).slice(1);
 
     const useMentions = Boolean(modifiers.find(mod => mod.toLowerCase() === 'tag'));
+    const useCpu = Boolean(modifiers.find(mod => mod.toLowerCase() === 'cpu'));
     const weekOverride = modifiers.find(mod => !isNaN(parseInt(mod)));
 
     let { season, week, stage } = await neonClient.getCurrentWeek();
     if (weekOverride) week = weekOverride;
 
-    const schedule = await neonClient.getWeekSchedule({ incompleteOnly, season, week, stage });
+    const allGames = await neonClient.getWeekSchedule({ incompleteOnly, season, week, stage });
     const playerTeams = getPlayerTeams(); // teamName (uppercase) → { id, name }
+
+    const isCpuTeam = (teamKey) => !playerTeams[teamKey]?.id;
+    const excludedGames = useCpu ? [] : allGames.filter(game =>
+        isCpuTeam(game.homeTeamName.toUpperCase()) || isCpuTeam(game.awayTeamName.toUpperCase())
+    );
+    const schedule = allGames.filter(game => !excludedGames.includes(game));
+
     const mentionedIds = new Set();
     const lines = [];
 
@@ -268,8 +276,23 @@ const processScheduleLookup = async (req, incompleteOnly = false) => {
         lines.push(`${homeLine} vs ${awayLine}${scoreLine}`);
     }
 
+    const footnoteParts = [];
+    if (excludedGames.length > 0) {
+        const cpuVsCpu = excludedGames.filter(game =>
+            isCpuTeam(game.homeTeamName.toUpperCase()) && isCpuTeam(game.awayTeamName.toUpperCase())
+        ).length;
+        const playerVsCpu = excludedGames.length - cpuVsCpu;
+        const command = req.message.content.trim().split(/\s+/)[0];
+        if (playerVsCpu > 0) footnoteParts.push(`- ${playerVsCpu} Player vs CPU game${playerVsCpu > 1 ? 's' : ''} excluded`);
+        if (cpuVsCpu > 0) footnoteParts.push(`- ${cpuVsCpu} CPU vs CPU game${cpuVsCpu > 1 ? 's' : ''} excluded`);
+        footnoteParts.push(`\nTip: Use \`${command} cpu\` to include CPU games`);
+    }
+
+    const footnote = footnoteParts.length > 0 ? `\n\n${footnoteParts.join('\n')}` : '';
+
     const messageBody =
         wrapInMonospace(headerLine + lines.join('\n\n'))
+        + footnote
         + `\n\n${SENT_BY_OPM_BOT_TAG}`;
 
     await wahaClient.sendMessage({
