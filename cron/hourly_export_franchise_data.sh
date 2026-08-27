@@ -4,25 +4,25 @@ set -ex
 
 run_steps() {
     # Step 1: Import league info
-    curl -s -X GET "https://neonsportz.com/api/leagues/OPM/ea/import/league-info/"
+    curl -s -X GET "https://neonsportz.com/api/leagues/${LEAGUE_ABBREV}/ea/import/league-info/"
 
     # Step 2: Wait 20 seconds
     sleep 20
 
     # Step 3a: Get teams (size=1)
-    TEAM_JSON=$(curl -s 'https://neonsportz.com/api/leagues/OPM/teams/?size=1')
+    TEAM_JSON=$(curl -s "https://neonsportz.com/api/leagues/${LEAGUE_ABBREV}/teams/?size=1")
 
     # Step 3b: Extract weekIndex
     WEEK_INDEX=$(echo "$TEAM_JSON" | jq -r '.results[0].weekIndex')
 
     # Step 3c: Import week
-    curl -s -X GET "https://neonsportz.com/api/leagues/OPM/ea/import/week/${WEEK_INDEX}/"
+    curl -s -X GET "https://neonsportz.com/api/leagues/${LEAGUE_ABBREV}/ea/import/week/${WEEK_INDEX}/"
 
     # Step 4: Wait 30 seconds
     sleep 30
 
     # Step 5: Import rosters
-    curl -s -X GET "https://neonsportz.com/api/leagues/OPM/ea/import/rosters/"
+    curl -s -X GET "https://neonsportz.com/api/leagues/${LEAGUE_ABBREV}/ea/import/rosters/"
 }
 
 # Run twice with 60 second pause in between
