@@ -49,7 +49,10 @@ const getContactName = async (whatsappId) => {
     const client = await getClient();
     try {
         const { data } = await client.get(`/api/${SESSION}/contacts/${encodeURIComponent(whatsappId)}`);
-        return data?.pushname;
+        if (!data?.pushname && !data?.name) {
+            console.warn(`[getContactName] No name found for ${whatsappId}. Full contact data:`, JSON.stringify(data, null, 2));
+        }
+        return data?.pushname || data?.name;
     } catch {
         return null;
     }
