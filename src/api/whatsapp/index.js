@@ -53,7 +53,8 @@ const getContactName = async (whatsappId) => {
             console.warn(`[getContactName] No name found for ${whatsappId}. Full contact data:`, JSON.stringify(data, null, 2));
         }
         return data?.pushname || data?.name;
-    } catch {
+    } catch (err) {
+        console.error(`[getContactName] Failed to fetch contact ${whatsappId}:`, err.message);
         return null;
     }
 };

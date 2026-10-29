@@ -415,7 +415,7 @@ const processAssignCommand = async (req) => {
             continue;
         }
 
-        const contactName = await wahaClient.getContactName(whatsappId);
+        const contactName = (await wahaClient.getContactName(whatsappId)) || whatsappId.split('@')[0];
         assignPlayerToTeam(teamName, whatsappId, contactName);
         results.push(`✅ ${teamName} ${NFL_TEAM_EMOJIS[teamName] || ''} → ${contactName ?? whatsappId}`);
     }
