@@ -15,7 +15,7 @@ services:
       - ./data:/usr/src/app/data
 
   waha:
-    image: devlikeapro/waha:gows-2026.5.1
+    image: devlikeapro/waha:gows-2026.10.1
     platform: linux/amd64
     ports:
       - "3000:3000"
